@@ -354,7 +354,7 @@ def test_model(args, test_loader, model, device, test_dataset):
     
     # 保存评估指标到CSV文件
     metrics_df = pd.DataFrame([metrics])
-    metrics_df.to_csv(os.path.join(args.output_path, 'metrics.csv'), index=False)
+    metrics_df.to_csv(os.path.join(args.output_path, f'metrics_{args.data_format}.csv'), index=False)
     
     # 可视化结果 - 对特定样本和特征进行绘图
     visualize_predictions(preds, trues, args.output_path, args.data_format)
@@ -369,7 +369,7 @@ def main():
     setup_seed(2023)
     
     # 设置设备
-    device = torch.device('cuda:1' if torch.cuda.is_available() and args.use_gpu else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() and args.use_gpu else 'cpu')
     
     # 创建数据集
     train_dataset = NetworkTrafficDataset(
@@ -407,7 +407,15 @@ def main():
         valid_ratio=args.valid_ratio,
         flag='test'
     )
-    
+    logging.info("========== 数据集信息 ==========")
+    logging.info(f"训练集大小: {len(train_dataset)}")
+    logging.info(f"验证集大小: {len(val_dataset)}")
+    logging.info(f"测试集大小: {len(test_dataset)}")
+    logging.info(f"数据集特征数量: {train_dataset.data_x.shape[1]}")
+    logging.info(f"数据集标签长度: {train_dataset.data_y.shape[1]}")
+    logging.info(f"数据集预测长度: {args.pred_len}")
+    logging.info(f"数据集序列长度: {args.seq_len}")
+    logging.info(f"数据集数据格式: {args.data_format}")
     # 创建数据加载器
     train_loader = DataLoader(
         train_dataset,

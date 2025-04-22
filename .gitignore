@@ -2,6 +2,9 @@
 .python-version
 *.pth
 result_*.txt
+*.log
+data/
+*.npy
 
 __pycache__/
 dataset/

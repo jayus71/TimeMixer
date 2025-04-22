@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import pandas as pd
+import logging
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
@@ -60,7 +61,8 @@ class NetworkTrafficDataset(Dataset):
             # 选择特征列
             data_cols = [city_col, value_col, 'hour', 'dayofweek', 'month', 'day']
             df_data = df[data_cols]
-            
+            timestamp_cols = ['hour', 'dayofweek', 'month', 'day']
+            # logging.info(f"first 5 rows of df_data: {df_data.head()}")
         else:
             # 第二种数据格式: 日期,小时,小区名,流量
             date_col = df.columns[0]  # 日期列
@@ -82,6 +84,7 @@ class NetworkTrafficDataset(Dataset):
             # 选择特征列
             data_cols = [hour_col, cell_col, traffic_col, 'dayofweek', 'month', 'day']
             df_data = df[data_cols]
+            timestamp_cols = [hour_col, 'dayofweek', 'month', 'day']
         
         # 分割数据集
         num_samples = len(df_data)
@@ -102,8 +105,7 @@ class NetworkTrafficDataset(Dataset):
         else:
             data = df_data.values
             
-        # 提取时间标记
-        timestamp_cols = ['hour', 'dayofweek', 'month', 'day']
+
         df_stamp = df[timestamp_cols][border1:border2]
         data_stamp = df_stamp.values
         
