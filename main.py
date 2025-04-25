@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader
 from data_provider.network_traffic_dataset import NetworkTrafficDataset
 from models.enhanced_timemixer import EnhancedTimeMixer
 from utils.config import get_args
+from utils.losses import *
 
 logging.basicConfig(filename='training.log', filemode='a', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -56,6 +57,7 @@ class EarlyStopping:
 
     def save_checkpoint(self, val_loss, model, path):
         if self.verbose:
+            logging.info(f'验证损失减少 ({self.val_loss_min:.6f} --> {val_loss:.6f})。保存模型...')
             print(f'验证损失减少 ({self.val_loss_min:.6f} --> {val_loss:.6f})。保存模型...')
         torch.save(model.state_dict(), path)
         self.val_loss_min = val_loss
@@ -67,7 +69,13 @@ def train_model(args, train_loader, val_loader, model, device):
     
     # 设置优化器和损失函数
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-    criterion = torch.nn.MSELoss()
+    # criterion = torch.nn.MSELoss()
+    if args.loss == 'MSE':
+        criterion = torch.nn.MSELoss()
+    elif args.loss == 'MAE':
+        criterion = torch.nn.L1Loss()
+    elif args.loss == 'MAPE':
+        criterion = mape_loss()
     
     # 早停
     early_stopping = EarlyStopping(patience=args.patience, verbose=True)
@@ -156,10 +164,12 @@ def train_model(args, train_loader, val_loader, model, device):
         avg_train_loss = train_loss / len(train_loader)
         avg_val_loss = val_loss / len(val_loader)
         print(f'Epoch [{epoch+1}/{args.train_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+        logging.info(f'Epoch [{epoch+1}/{args.train_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
         
         # 早停检查
         early_stopping(avg_val_loss, model, model_save_path)
         if early_stopping.early_stop:
+            logging.info("Early stopping")
             print("Early stopping")
             break
     

@@ -6,6 +6,8 @@ result_*.txt
 data/
 *.npy
 
+
+output/
 __pycache__/
 dataset/
 results/
