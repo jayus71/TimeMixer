@@ -17,9 +17,10 @@ from torch.utils.data import DataLoader
 from data_provider.network_traffic_dataset import NetworkTrafficDataset
 from models.enhanced_timemixer import EnhancedTimeMixer
 from utils.config import get_args
-from utils.losses import *
 
-logging.basicConfig(filename='training.log', filemode='a', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# 屏蔽警告
+import warnings
+warnings.filterwarnings("ignore")
 
 # 设置随机种子
 def setup_seed(seed):
@@ -29,6 +30,32 @@ def setup_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
+
+class MAPE_loss(torch.nn.Module):
+    '''
+    自定义MAPE损失函数：平均绝对百分比误差
+    Mean Absolute Percentage Error
+    '''
+    def __init__(self, epsilon=1e-10):
+        super(MAPE_loss, self).__init__()
+        self.epsilon = epsilon
+    
+    def forward(self, pred, target):
+        """
+        计算MAPE损失
+        
+        参数:
+            pred: 模型预测值
+            target: 真实目标值
+        """
+        # 添加小常数避免除零
+        target_safe = torch.abs(target) + self.epsilon
+        
+        # 计算绝对百分比误差
+        loss = torch.mean(torch.abs((target - pred) / target_safe)) * 100
+        return loss
+
+    
 # 早停类
 class EarlyStopping:
     def __init__(self, patience=7, verbose=False, delta=0):
@@ -68,14 +95,14 @@ def train_model(args, train_loader, val_loader, model, device):
     os.makedirs(args.checkpoints, exist_ok=True)
     
     # 设置优化器和损失函数
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     # criterion = torch.nn.MSELoss()
     if args.loss == 'MSE':
         criterion = torch.nn.MSELoss()
     elif args.loss == 'MAE':
         criterion = torch.nn.L1Loss()
     elif args.loss == 'MAPE':
-        criterion = mape_loss()
+        criterion = MAPE_loss()
     
     # 早停
     early_stopping = EarlyStopping(patience=args.patience, verbose=True)
@@ -260,8 +287,13 @@ def test_model(args, test_loader, model, device, test_dataset):
     model.load_state_dict(torch.load(model_save_path))
     model.eval()
     
-    criterion = torch.nn.MSELoss()
-    
+    # 设置损失函数
+    if args.loss == 'MSE':
+        criterion = torch.nn.MSELoss()
+    elif args.loss == 'MAE':
+        criterion = torch.nn.L1Loss()
+    elif args.loss == 'MAPE':
+        criterion = MAPE_loss()
     test_loss = 0
     preds = []
     trues = []
@@ -328,6 +360,8 @@ def test_model(args, test_loader, model, device, test_dataset):
     pred_traffic = preds[:, :, traffic_feature_idx]
     true_traffic = trues[:, :, traffic_feature_idx]
     
+    mse = np.mean((pred_traffic - true_traffic) ** 2)
+    
     # 平均绝对误差 (MAE)
     mae = np.mean(np.abs(pred_traffic - true_traffic))
     
@@ -353,7 +387,7 @@ def test_model(args, test_loader, model, device, test_dataset):
     
     # 打印并记录评估指标
     metrics = {
-        'MSE': avg_test_loss,
+        'MSE': float(mse),
         'MAE': float(mae),
         'RMSE': float(rmse),
         'MAPE': float(mape),
@@ -367,14 +401,22 @@ def test_model(args, test_loader, model, device, test_dataset):
     metrics_df.to_csv(os.path.join(args.output_path, f'metrics_{args.data_format}.csv'), index=False)
     
     # 可视化结果 - 对特定样本和特征进行绘图
-    visualize_predictions(preds, trues, args.output_path, args.data_format)
+    output_path = os.path.join(args.output_path, f'{args.data_format}_visualization')
+    os.makedirs(output_path, exist_ok=True)
+    visualize_predictions(preds, trues, output_path, args.data_format)
     
     return avg_test_loss, preds, trues, metrics
 
 def main():
     # 获取参数
     args = get_args()
-    
+    logging.basicConfig(
+        filename=args.log_file,
+        filemode='a',
+        level=getattr(logging, args.log_level),
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
     # 设置随机种子
     setup_seed(2023)
     
@@ -426,6 +468,13 @@ def main():
     logging.info(f"数据集预测长度: {args.pred_len}")
     logging.info(f"数据集序列长度: {args.seq_len}")
     logging.info(f"数据集数据格式: {args.data_format}")
+    logging.info(f"数据集标准化: {args.scale}")
+    # 文件名
+    logging.info(f"数据文件路径: {args.data_path}")
+    # 损失函数
+    logging.info(f"损失函数: {args.loss}")
+    logging.info(f"模型保存路径: {args.checkpoints}")
+    logging.info(f"输出结果路径: {args.output_path}")
     # 创建数据加载器
     train_loader = DataLoader(
         train_dataset,

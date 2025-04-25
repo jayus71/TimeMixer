@@ -7,7 +7,7 @@ def get_args():
     # 基本配置
     parser.add_argument('--task_name', type=str, default='long_term_forecast',
                         help='任务名称，可选:[long_term_forecast, short_term_forecast]')
-    parser.add_argument('--data_path', type=str, default='data/AIIA_hour/dataA_fill copy.csv',
+    parser.add_argument('--data_path', type=str, default='./data/AIIA_hour/split_data/2017_dataA_fill.csv',
                         help='数据文件路径')
     parser.add_argument('--data_format', type=int, default=1,
                         help='数据格式：1 表示 (时间,城市,值)，2 表示 (日期,小时,小区名,流量)')
@@ -16,6 +16,12 @@ def get_args():
     parser.add_argument('--output_path', type=str, default='./output',
                         help='输出结果保存路径')
     
+    # 日志配置
+    parser.add_argument('--log_file', type=str, default='log.log',
+                        help='日志文件名')
+    parser.add_argument('--log_level', type=str, default='INFO',
+                        help='日志级别，可选:[DEBUG, INFO, WARNING, ERROR, CRITICAL]')
+    
     # 预测任务配置
     parser.add_argument('--seq_len', type=int, default=96,
                         help='输入序列长度')
@@ -23,11 +29,12 @@ def get_args():
                         help='开始标记长度')
     parser.add_argument('--pred_len', type=int, default=24,
                         help='预测序列长度')
-    
+    parser.add_argument('--features', type=str, default='MS',
+                        help='预测任务特征类型，可选:[M, S, MS]; M:多变量预测多变量, S:单变量预测单变量, MS:多变量预测单变量')
     # 数据加载配置
     parser.add_argument('--train_ratio', type=float, default=0.7,
                         help='训练集比例')
-    parser.add_argument('--valid_ratio', type=float, default=0.1,
+    parser.add_argument('--valid_ratio', type=float, default=0.2,
                         help='验证集比例')
     parser.add_argument('--scale', action='store_true', default=True,
                         help='是否标准化数据')
@@ -65,13 +72,13 @@ def get_args():
                         help='分解方法，支持 moving_avg 或 dft_decomp')
     parser.add_argument('--top_k', type=int, default=5,
                         help='DFT分解的top_k参数')
-    parser.add_argument('--use_future_temporal_feature', type=int, default=0,
+    parser.add_argument('--use_future_temporal_feature', type=int, default=1,
                         help='是否使用未来时间特征')
     
     # 优化
     parser.add_argument('--num_workers', type=int, default=4,
                         help='数据加载器工作线程数')
-    parser.add_argument('--train_epochs', type=int, default=30,
+    parser.add_argument('--train_epochs', type=int, default=50,
                         help='训练轮数')
     # loss函数选择
     parser.add_argument('--loss', type=str, default='MSE',
