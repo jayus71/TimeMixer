@@ -7,7 +7,7 @@ def get_args():
     # 基本配置
     parser.add_argument('--task_name', type=str, default='long_term_forecast',
                         help='任务名称，可选:[long_term_forecast, short_term_forecast]')
-    parser.add_argument('--data_path', type=str, default='./data/AIIA_hour/split_data/2017_dataA_fill.csv',
+    parser.add_argument('--data_path', type=str, default='data/lte_network/split_month_data/2017_10_train.csv',
                         help='数据文件路径')
     parser.add_argument('--data_format', type=int, default=1,
                         help='数据格式：1 表示 (时间,城市,值)，2 表示 (日期,小时,小区名,流量)')
@@ -78,16 +78,16 @@ def get_args():
     # 优化
     parser.add_argument('--num_workers', type=int, default=4,
                         help='数据加载器工作线程数')
-    parser.add_argument('--train_epochs', type=int, default=50,
+    parser.add_argument('--train_epochs', type=int, default=1,
                         help='训练轮数')
     # loss函数选择
     parser.add_argument('--loss', type=str, default='MSE',
                         help='损失函数')
     parser.add_argument('--batch_size', type=int, default=64,
                         help='批次大小')
-    parser.add_argument('--patience', type=int, default=10,
+    parser.add_argument('--patience', type=int, default=20,
                         help='早停耐心值')
-    parser.add_argument('--learning_rate', type=float, default=0.0001,
+    parser.add_argument('--learning_rate', type=float, default=0.00001,
                         help='学习率')
     parser.add_argument('--use_gpu', type=bool, default=True,
                         help='是否使用GPU')

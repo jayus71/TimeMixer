@@ -181,8 +181,13 @@ def train_model(args, train_loader, val_loader, model, device):
                     
                     outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
                     
+                    f_dim = -1 if args.features == 'MS' else 0
+                    outputs = outputs[:, -args.pred_len:, f_dim:]
+                    batch_y = batch_y[:, -args.pred_len:, f_dim:]
+                    # logging.info(f"outputs shape: {outputs.shape}, batch_y shape: {batch_y.shape}")
+                    # 
                     # 计算损失
-                    loss = criterion(outputs, batch_y[:, -args.pred_len:, :])
+                    loss = criterion(outputs, batch_y)
                     val_loss += loss.item()
                     
                     # 更新进度条
@@ -190,8 +195,8 @@ def train_model(args, train_loader, val_loader, model, device):
         
         avg_train_loss = train_loss / len(train_loader)
         avg_val_loss = val_loss / len(val_loader)
-        print(f'Epoch [{epoch+1}/{args.train_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
-        logging.info(f'Epoch [{epoch+1}/{args.train_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+        print(f'Epoch [{epoch+1}/{args.train_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.10f}')
+        logging.info(f'Epoch [{epoch+1}/{args.train_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.10f}')
         
         # 早停检查
         early_stopping(avg_val_loss, model, model_save_path)
@@ -215,10 +220,7 @@ def visualize_predictions(preds, trues, output_path, data_format=1):
     os.makedirs(output_path, exist_ok=True)
     
     # 确定流量数据的特征索引
-    if data_format == 1:
-        traffic_feature_idx = 1  # 第一种格式：流量值在索引1
-    else:
-        traffic_feature_idx = 2  # 第二种格式：流量值在索引2
+    traffic_feature_idx = -1
     
     print(f"预测值形状: {preds.shape}, 真实值形状: {trues.shape}")
     print(f"使用特征索引 {traffic_feature_idx} 作为流量数据")
@@ -321,7 +323,10 @@ def test_model(args, test_loader, model, device, test_dataset):
                     dec_inp = None
                 
                 outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                
+                f_dim = -1 if args.features == 'MS' else 0
+                outputs = outputs[:, -args.pred_len:, f_dim:]
+                batch_y = batch_y[:, -args.pred_len:, f_dim:]
+                # print(f"outputs shape: {outputs.shape}, batch_y shape: {batch_y.shape}")
                 # 计算损失
                 loss = criterion(outputs, batch_y[:, -args.pred_len:, :])
                 test_loss += loss.item()
@@ -330,8 +335,8 @@ def test_model(args, test_loader, model, device, test_dataset):
                 progress.update(test_task, advance=1, description=f"[red]Testing - Loss: {loss.item():.4f}")
                 # 保存预测和真实值
                 pred = outputs.detach().cpu().numpy()
-                true = batch_y[:, -args.pred_len:, :].detach().cpu().numpy()
-                
+                true = batch_y.detach().cpu().numpy()
+                # print(f"pred shape: {pred.shape}, true shape: {true.shape}")
                 preds.append(pred)
                 trues.append(true)
     
@@ -353,13 +358,13 @@ def test_model(args, test_loader, model, device, test_dataset):
     np.save(os.path.join(args.output_path, 'trues.npy'), trues)
     
     # 确定流量特征索引
-    traffic_feature_idx = 1 if args.data_format == 1 else 2
+    traffic_feature_idx = -1
     
     # 计算额外的评估指标
     # 只对流量特征计算评估指标
     pred_traffic = preds[:, :, traffic_feature_idx]
     true_traffic = trues[:, :, traffic_feature_idx]
-    
+    print(f"流量预测 - 预测值形状: {pred_traffic.shape}, 真实值形状: {true_traffic.shape}")
     mse = np.mean((pred_traffic - true_traffic) ** 2)
     
     # 平均绝对误差 (MAE)
@@ -424,6 +429,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() and args.use_gpu else 'cpu')
     
     # 创建数据集
+# 主程序中的使用方式不变
     train_dataset = NetworkTrafficDataset(
         file_path=args.data_path,
         seq_len=args.seq_len,
@@ -433,7 +439,10 @@ def main():
         scale=args.scale,
         train_ratio=args.train_ratio,
         valid_ratio=args.valid_ratio,
-        flag='train'
+        flag='train',
+        timeenc=1 if args.embed == 'timeF' else 0,
+        freq=args.freq,
+        features=args.features
     )
     
     val_dataset = NetworkTrafficDataset(
@@ -445,7 +454,10 @@ def main():
         scale=args.scale,
         train_ratio=args.train_ratio,
         valid_ratio=args.valid_ratio,
-        flag='val'
+        flag='val',
+        timeenc=1 if args.embed == 'timeF' else 0,
+        freq=args.freq,
+        features=args.features
     )
     
     test_dataset = NetworkTrafficDataset(
@@ -457,7 +469,10 @@ def main():
         scale=args.scale,
         train_ratio=args.train_ratio,
         valid_ratio=args.valid_ratio,
-        flag='test'
+        flag='test',
+        timeenc=1 if args.embed == 'timeF' else 0,
+        freq=args.freq,
+        features=args.features
     )
     logging.info("========== 数据集信息 ==========")
     logging.info(f"训练集大小: {len(train_dataset)}")
